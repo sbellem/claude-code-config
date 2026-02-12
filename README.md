@@ -26,13 +26,15 @@ Then inside the session, run `/trailofbits:config`. It walks you through install
 - [Hooks](#hooks)
 - [Plugins and Skills](#plugins-and-skills)
 - [MCP Servers](#mcp-servers)
-- [Fast Mode](#fast-mode)
 - [Local Models](#local-models)
+- [Personalization](#personalization)
 
 **[Usage](#usage)**
 - [Continuous Improvement](#continuous-improvement)
+- [Project-level CLAUDE.md](#project-level-claudemd)
 - [Context Management](#context-management)
 - [Web Browsing](#web-browsing)
+- [Fast Mode](#fast-mode)
 - [Commands](#commands)
 - [Recommended Skills](#recommended-skills)
 - [Recommended MCP Servers](#recommended-mcp-servers)
@@ -140,11 +142,11 @@ Copy `settings.json` to `~/.claude/settings.json` (or merge entries into your ex
 A two-line status bar at the bottom of the terminal:
 
 ```
- claude-code-config │ main │ +42 -17
- Claude Opus 4.6 │ $0.83 │ 12m 34s │ 72% ↻89%
+ [Opus 4.6] 📁 claude-code-config │ 🌿 main
+ ████⣿⣿⣿⣿⣿⣿⣿⣿ 28% │ $0.83 │ ⏱ 12m 34s ↻89%
 ```
 
-Line 1 shows the repo name, git branch, and lines changed. Line 2 shows the model, session cost, elapsed time, context window remaining (color-coded: green >50%, yellow >20%, red below), and prompt cache hit rate.
+Line 1 shows the model, current folder, and git branch. Line 2 shows a visual context usage bar (color-coded: green <50%, yellow 50-79%, red 80%+), session cost, elapsed time, and prompt cache hit rate.
 
 Copy the script:
 
@@ -158,7 +160,7 @@ The `statusLine` entry in `settings.json` points to this script. Requires `jq`.
 
 ### Global CLAUDE.md
 
-The global `CLAUDE.md` file at `~/.claude/CLAUDE.md` sets default instructions for every Claude Code session. It defines code quality limits, tooling preferences, workflow conventions, and skill triggers.
+The global `CLAUDE.md` file at `~/.claude/CLAUDE.md` sets default instructions for every Claude Code session. It covers development philosophy (no speculative features, no premature abstraction, replace don't deprecate), code quality hard limits (function length, complexity, line width), language-specific toolchains for Python (`uv`, `ruff`, `ty`), Node/TypeScript (`oxlint`, `vitest`), Rust (`clippy`, `cargo deny`), Bash, and GitHub Actions, plus testing methodology, code review order, and workflow conventions (commits, hooks, PRs).
 
 Copy the template into place:
 
@@ -166,13 +168,7 @@ Copy the template into place:
 cp claude-md-template.md ~/.claude/CLAUDE.md
 ```
 
-Review and customize it for your own preferences. The template is opinionated -- it assumes specific tools (`ruff`, `ty`, `oxlint`, `cargo clippy`, etc.) and enforces hard limits on function length, complexity, and line width. For background on how CLAUDE.md files work (hierarchy, auto memory, modular rules, imports), see [Manage Claude's memory](https://code.claude.com/docs/en/memory).
-
-#### Project-level CLAUDE.md
-
-The global file sets defaults; project-level `CLAUDE.md` files at the repo root add project-specific context. A good project CLAUDE.md includes architecture (directory tree, key abstractions), project-specific commands (`make dev`, `make test`), codebase navigation patterns (ast-grep examples for your codebase), domain-specific APIs and gotchas, and testing conventions unique to the project.
-
-For an example of a well-structured project CLAUDE.md, see [crytic/slither's CLAUDE.md](https://github.com/crytic/slither/blob/master/CLAUDE.md). It layers slither-specific context -- SlithIR internals, detector traversal patterns, type handling pitfalls -- on top of the same global standards from this repo.
+Review and customize it for your own preferences. The template is opinionated -- adjust the language sections, tool choices, and hard limits to match your stack. For background on how CLAUDE.md files work (hierarchy, auto memory, modular rules, imports), see [Manage Claude's memory](https://code.claude.com/docs/en/memory).
 
 ## Configuration
 
@@ -184,9 +180,9 @@ At Trail of Bits we run Claude Code in bypass-permissions mode (`--dangerously-s
 
 Claude Code has a native sandbox that provides filesystem and network isolation using OS-level primitives (Seatbelt on macOS, bubblewrap on Linux). Enable it by typing `/sandbox` in a session. In auto-allow mode, Bash commands that stay within sandbox boundaries run without permission prompts.
 
-**Default behavior:** The agent can write only to the current working directory and its subdirectories, but it can **read the entire filesystem** (except certain denied directories). Network access is restricted to explicitly allowed domains. This means the sandbox protects your system from modification, but doesn't provide read isolation -- the agent can still read `~/.ssh`, `~/.aws`, etc.
+**Default behavior:** Writes are restricted to the current working directory and its subdirectories. Reads are unrestricted -- the agent can still read `~/.ssh`, `~/.aws`, etc. Network access is limited to explicitly allowed domains.
 
-**Hardening reads:** The `settings.json` template in this repo includes `Read` and `Edit` deny rules that block access to credentials and secrets:
+**Hardening reads:** The `settings.json` template includes `Read` and `Edit` deny rules that block access to credentials and secrets:
 
 - **SSH/GPG keys** -- `~/.ssh/**`, `~/.gnupg/**`
 - **Cloud credentials** -- `~/.aws/**`, `~/.azure/**`, `~/.kube/**`, `~/.docker/config.json`
@@ -196,7 +192,7 @@ Claude Code has a native sandbox that provides filesystem and network isolation 
 - **macOS keychain** -- `~/Library/Keychains/**`
 - **Crypto wallets** -- metamask, electrum, exodus, phantom, solflare app data
 
-**How these rules interact with the sandbox:** Permission deny rules and the sandbox are two layers enforcing the same rules. Without `/sandbox`, a `Read(~/.ssh/**)` deny rule only blocks Claude's built-in Read tool -- a Bash command like `cat ~/.ssh/id_rsa` can still reach the file. With `/sandbox` enabled, the sandbox takes the same `Read` and `Edit` deny rules and enforces them at the OS level (Seatbelt/bubblewrap), so Bash commands are also blocked. Use both: deny rules as the baseline, `/sandbox` for OS-level enforcement that survives prompt injection.
+Without `/sandbox`, deny rules only block Claude's built-in tools -- Bash commands bypass them. With `/sandbox` enabled, the same rules are enforced at the OS level (Seatbelt/bubblewrap), so Bash commands are also blocked. Use both.
 
 For the design rationale behind sandboxing, see Anthropic's [engineering blog post](https://www.anthropic.com/engineering/claude-code-sandboxing). For the full configuration reference, see the [sandboxing docs](https://code.claude.com/docs/en/sandboxing).
 
@@ -334,9 +330,9 @@ claude plugin marketplace add trailofbits/skills-curated
 
 | Repository | Description |
 |------------|-------------|
-| [trailofbits/skills](https://github.com/trailofbits/skills) | Security auditing, code review, smart contract analysis, reverse engineering, and development workflows. Open source -- contributions welcome. |
-| [trailofbits/skills-internal](https://github.com/trailofbits/skills-internal) | Internal skills: report writing, scoping, recruiting, brand tools, and client-specific workflows. Private to Trail of Bits. |
-| [trailofbits/skills-curated](https://github.com/trailofbits/skills-curated) | Vetted third-party skills and the canonical list of approved external marketplaces. |
+| [trailofbits/skills](https://github.com/trailofbits/skills) | Our public skills for security auditing, smart contract analysis, reverse engineering, code review, and development workflows. |
+| [trailofbits/skills-internal](https://github.com/trailofbits/skills-internal) | Automated exploitation, fuzz harness generation, vulnerability-class-specific analysis, audit report writing in the Trail of Bits house style, engagement scoping, client deliverables, and proprietary workflows. Private to Trail of Bits. |
+| [trailofbits/skills-curated](https://github.com/trailofbits/skills-curated) | Third-party skills and external marketplaces we've vetted and approved for use. Every addition gets code review. |
 
 For external marketplaces (Anthropic official, superpowers, compound-engineering, etc.), see [skills-curated](https://github.com/trailofbits/skills-curated) -- it maintains the approved list and install scripts.
 
@@ -344,17 +340,17 @@ For external marketplaces (Anthropic official, superpowers, compound-engineering
 
 Where to publish depends on the audience:
 
-- **Public and open source** -- submit a PR to [trailofbits/skills](https://github.com/trailofbits/skills). See its [CLAUDE.md](https://github.com/trailofbits/skills/blob/main/CLAUDE.md) for authoring guidelines.
+- **Public and open source** -- submit a PR to [trailofbits/skills](https://github.com/trailofbits/skills).
 - **Internal to Trail of Bits** -- submit a PR to [trailofbits/skills-internal](https://github.com/trailofbits/skills-internal).
 - **Third-party skill you want approved** -- submit a PR to [trailofbits/skills-curated](https://github.com/trailofbits/skills-curated) with attribution to the original source. Every PR gets code review.
 
 #### Writing custom skills
 
-When you find yourself repeating the same multi-step workflow, extract it into a skill. Read Anthropic's [skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) for guidance on structure, descriptions, and testing.
+When you find yourself repeating the same multi-step workflow, extract it into a skill. Read Anthropic's [skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) first — it covers structure, descriptions, and progressive disclosure.
 
-The short version: don't write skills by hand. Ask Claude to create one for you — Anthropic ships a [skill creator](https://github.com/anthropics/skills/blob/main/skills/skill-creator/SKILL.md) skill for this. When you notice yourself repeating the same workflow, ask Claude to extract it into a skill. Be specific in the description so Claude knows when to activate it.
+The `plugin-dev` plugin (from `claude-plugins-official`) has the tooling for this. `/plugin-dev:skill-development` walks you through a 6-step process: gather concrete usage examples, plan what references and scripts to bundle, create the skill structure, write the SKILL.md, validate with the `skill-reviewer` agent, and iterate on real tasks. For a full plugin with multiple skills, commands, and agents, use `/plugin-dev:create-plugin` instead — it orchestrates the entire process.
 
-The `plugin-dev` plugin (included by default from `claude-plugins-official`) provides `/skill-development` to extract skills from conversations and a `skill-reviewer` agent to check them against Anthropic's best practices.
+The quality of a skill depends on what you put into it. For security skills especially, don't just describe the workflow — bundle the reference material that makes it expert-level: analysis checklists, vulnerability patterns, example outputs, and the decision logic an experienced auditor would apply. The SKILL.md itself should be lean (under 2,000 words); move detailed reference content into `references/` files that the skill loads as needed.
 
 ### MCP Servers
 
@@ -373,14 +369,6 @@ MCP servers are configured in `.mcp.json` files. Claude Code merges configs from
 - **`.mcp.json` in the project root** -- project-specific servers
 
 Copy `mcp-template.json` from this repo to `~/.mcp.json` for global availability. Replace `your-exa-api-key-here` with your actual key, or remove the `exa` entry if you don't have one. Add project-specific MCP servers (e.g., a local database tool) to the project's `.mcp.json`.
-
-### Fast Mode
-
-`/fast` toggles fast mode. Same Opus 4.6 model, ~2.5x faster output, 6x the cost per token. Leave it off by default.
-
-The only time fast mode is worth it is **tight interactive loops** -- you're debugging live, iterating on output, and every second of latency costs you focus. If you're about to kick off an autonomous run (`/fix-issue`, a swarm, anything you walk away from), turn it off first. The agent doesn't benefit from lower latency; you're just burning money.
-
-If you do use it, enable it at session start. Toggling it on mid-conversation reprices your entire context at fast-mode rates and invalidates prompt cache. See the [fast mode docs](https://code.claude.com/docs/en/fast-mode) for details.
 
 ### Local Models
 
@@ -416,17 +404,11 @@ claude
 
 Or use the `claude-local` shell function from [Shell Setup](#shell-setup) to avoid typing the env vars every time.
 
-#### Environment variables
+For the full list of environment variables (model overrides, subagent models, traffic controls, etc.), see the [model configuration docs](https://code.claude.com/docs/en/model-config).
 
-| Variable | Purpose |
-|----------|---------|
-| `ANTHROPIC_BASE_URL` | API endpoint (e.g., `http://localhost:1234`) |
-| `ANTHROPIC_AUTH_TOKEN` | API key (any string for local servers) |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | Default model for most operations |
-| `ANTHROPIC_DEFAULT_OPUS_MODEL` | Model for opus-tier tasks |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | Model for summarization tasks |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | Model for subagent tasks |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | Set to `1` to disable all non-essential traffic (includes auto-updates) |
+### Personalization
+
+You can customize the spinner verbs that appear while Claude is working. Ask Claude: "In my settings, make my spinner verbs Hackers themed" — or Doom, or Star Trek, or anything else.
 
 ## Usage
 
@@ -438,11 +420,15 @@ Most people's use of Claude Code plateaus early. You find a workflow that works,
 
 Run `/insights` once a week. It analyzes your recent sessions and surfaces patterns -- what's working, what's failing, where you're spending time. When it tells you something useful, act on it: add a rule to your CLAUDE.md, write a hook to block a mistake you keep making, extract a repeated workflow into a skill. Each adjustment compounds. After a few weeks your setup is meaningfully different from the defaults, tuned to how you actually work.
 
+### Project-level CLAUDE.md
+
+For each project you work on, add a `CLAUDE.md` at the repo root with project-specific context. The [global CLAUDE.md](#global-claudemd) sets defaults; the project file layers on what's unique to this codebase. A good project CLAUDE.md includes architecture (directory tree, key abstractions), build and test commands (`make dev`, `make test`), codebase navigation patterns (ast-grep examples for your codebase), domain-specific APIs and gotchas, and testing conventions.
+
+For an example of a well-structured project CLAUDE.md, see [crytic/slither's CLAUDE.md](https://github.com/crytic/slither/blob/master/CLAUDE.md). It layers slither-specific context -- SlithIR internals, detector traversal patterns, type handling pitfalls -- on top of the same global standards from this repo.
+
 ### Output Styles
 
 Enable the **Explanatory** [output style](https://code.claude.com/docs/en/output-styles) (`/output-style explanatory` or `"outputStyle": "Explanatory"` in `settings.json`) when getting familiar with a new codebase. Claude explains frameworks and code patterns as it works, adding "★ Insight" blocks with reasoning and design choices alongside its normal output. Useful when auditing unfamiliar code, reviewing a language you don't write daily, or onboarding onto a client engagement. The tradeoff is context: longer responses mean earlier compaction. Switch back to the default when you want speed. You can also [create custom styles](https://code.claude.com/docs/en/output-styles) as markdown files in `~/.claude/output-styles/`.
-
-You can also customize the spinner verbs that appear while Claude is working. Ask Claude: "In my settings, make my spinner verbs Star Trek themed."
 
 ### Context Management
 
@@ -509,6 +495,14 @@ Browser automation via the [Claude in Chrome](https://chromewebstore.google.com/
 | Interact with authenticated/internal pages | Claude in Chrome |
 | Record a video of browser actions | agent-browser |
 | Inspect visual layout or take screenshots for analysis | Claude in Chrome |
+
+### Fast Mode
+
+`/fast` toggles fast mode. Same Opus 4.6 model, ~2.5x faster output, 6x the cost per token. Leave it off by default.
+
+The only time fast mode is worth it is **tight interactive loops** -- you're debugging live, iterating on output, and every second of latency costs you focus. If you're about to kick off an autonomous run (`/fix-issue`, a swarm, anything you walk away from), turn it off first. The agent doesn't benefit from lower latency; you're just burning money.
+
+If you do use it, enable it at session start. Toggling it on mid-conversation reprices your entire context at fast-mode rates and invalidates prompt cache. See the [fast mode docs](https://code.claude.com/docs/en/fast-mode) for details.
 
 ### Commands
 
